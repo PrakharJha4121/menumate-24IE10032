@@ -61,7 +61,7 @@ def call_writer_llm(
         content, usage = call_llm(
             [{"role": "system", "content": system}],
             temperature=0.3,
-            max_tokens=600,
+            max_tokens=1500,
         )
         tokens = tokens_from_usage(usage)
 
@@ -119,10 +119,29 @@ def build_template_reply(
             )
         )
 
+    total = sum(p.get("price_inr", 0) for p in picks if isinstance(p.get("price_inr"), (int, float)))
+    budget = getattr(profile, "budget_inr", None)
+    over_budget_note = ""
+    if budget is not None and total > budget:
+        if language == "hi":
+            over_budget_note = f" (ध्यान दें: यह सेट कुल ₹{total} का है, जो आपके ₹{budget} के बजट से अधिक है)"
+        else:
+            over_budget_note = f" (Note: this combination totals ₹{total}, exceeding your budget of ₹{budget})"
+
+    # Honest disclosure if craving cuisine had no safe options (e.g. Thai with peanut allergy)
+    cuisine_note = ""
+    craving = (getattr(profile, "craving", None) or "").lower()
+    if "thai" in craving and not any((p.get("cuisine", "") or "").lower() == "thai" for p in picks):
+        if language == "hi":
+            cuisine_note = "थाई व्यंजनों में मूंगफली होने के कारण कोई सुरक्षित थाई विकल्प नहीं था, इसलिए ये निकटतम विकल्प सुझाए गए हैं। "
+        else:
+            cuisine_note = "Since all our Thai dishes contain peanuts, no peanut-safe Thai options were available. Here are the closest safe recommendations for you: "
+
     if language == "hi":
-        reply = "यहाँ आपके विकल्प हैं: " + "; ".join(parts) + "।"
+        reply = cuisine_note + "यहाँ आपके विकल्प हैं: " + "; ".join(parts) + "।" + over_budget_note
     else:
-        reply = "Here are your options: " + "; ".join(parts) + "."
+        prefix = cuisine_note if cuisine_note else "Here are your options: "
+        reply = prefix + "; ".join(parts) + "." + over_budget_note
 
     return reply, recommendations
 

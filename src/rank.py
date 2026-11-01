@@ -65,7 +65,7 @@ def rank_and_select(
     profile,  # schema.Profile
     rank_hints: dict,
 ) -> tuple[list[dict], list[dict], list[RuleTrace]]:
-    """Rank eligible items and select up to 3.
+    """Rank eligible items and select up to 3 using combinatorial budget-aware search.
 
     Returns (picks, scored_list, rule_trace_additions).
     """
@@ -98,78 +98,92 @@ def rank_and_select(
                 )
             )
 
-        # P-10 serves penalty (party_size >= 3 prefers serves >= 2)
-        party = getattr(profile, "party_size", None)
-        if party is not None and party >= 3:
-            if item.get("serves", 1) < 2:
-                score -= 0.5
-                rule_trace.append(
-                    RuleTrace(
-                        rule_id="P-10",
-                        item_id=item["id"],
-                        outcome="penalize",
-                        detail="serves<2 for party>=3",
-                    )
-                )
-
         scored.append({"item": item, "score": score})
 
     # Sort descending by score
     scored.sort(key=lambda x: x["score"], reverse=True)
 
-    # Greedy selection: prefer different courses; enforce budget soft constraint
-    picks: list[dict] = []
-    courses_used: set[str] = set()
-    running_price = 0
-
+    # Combinatorial selection over top candidates (up to top 15)
     budget = getattr(profile, "budget_inr", None)
+    party = getattr(profile, "party_size", None)
 
-    # Two passes: first pick best from each course, then fill
-    candidates = [s["item"] for s in scored]
+    top_candidates = scored[:15]
+    n_items = len(top_candidates)
 
-    # Track which items got course-variety penalties during selection
-    course_penalized: set[str] = set()
+    best_combo: list[dict] = []
+    best_combo_score = -1e9
 
-    for item in candidates:
-        if len(picks) >= 3:
-            break
+    # Generate all non-empty subsets of size 1 to min(3, n_items)
+    from itertools import combinations
+    for k in range(1, min(3, n_items) + 1):
+        for combo in combinations(top_candidates, k):
+            items = [c["item"] for c in combo]
+            relevance_sum = sum(c["score"] for c in combo)
+            total_price = sum(it.get("price_inr", 0) for it in items)
 
-        course = item.get("course", "unknown")
-        price = item.get("price_inr", 0)
+            # Penalties:
+            # 1. Course variety penalty: 0.3 for each duplicated course
+            courses = [it.get("course", "unknown") for it in items]
+            course_penalty = 0.3 * (len(courses) - len(set(courses)))
 
-        penalty = 0.0
-        if course in courses_used:
-            penalty += 0.3
-            if item["id"] not in course_penalized:
-                course_penalized.add(item["id"])
+            # 2. Serves penalty: if party >= 3, prefer dishes that serve >= 2
+            serves_penalty = 0.0
+            if party is not None and party >= 3:
+                serves_penalty = sum(0.5 for it in items if it.get("serves", 1) < 2)
 
-        if budget is not None and running_price + price > budget:
-            penalty += 0.2
+            # 3. Budget penalty: massive penalty if set exceeds budget
+            budget_penalty = 0.0
+            if budget is not None and total_price > budget:
+                # Heavy penalty so an in-budget set always wins over an over-budget set
+                budget_penalty = 10.0 + 0.05 * (total_price - budget)
 
-        # Accept the item despite penalty (soft rule; we pick best we have)
-        picks.append(item)
-        courses_used.add(course)
-        running_price += price
+            # Size bonus: gently prefer 3 dishes over 2 or 1 if eligible and within budget
+            size_bonus = 0.2 * len(items)
 
-        if penalty > 0 and item["id"] in course_penalized:
+            combo_score = relevance_sum - course_penalty - serves_penalty - budget_penalty + size_bonus
+
+            # Prefer higher size on tie or near tie
+            if combo_score > best_combo_score:
+                best_combo_score = combo_score
+                best_combo = items
+
+    picks = best_combo if best_combo else [s["item"] for s in scored[:3]]
+
+    # Trace penalties for final chosen picks
+    final_courses: set[str] = set()
+    total_price = sum(it.get("price_inr", 0) for it in picks)
+
+    for item in picks:
+        c = item.get("course", "unknown")
+        if c in final_courses:
             rule_trace.append(
                 RuleTrace(
                     rule_id="P-10",
                     item_id=item["id"],
                     outcome="penalize",
-                    detail=f"course_variety_or_budget_penalty={penalty:.2f}",
+                    detail="course_variety_repeated_course=0.30",
+                )
+            )
+        final_courses.add(c)
+
+        if party is not None and party >= 3 and item.get("serves", 1) < 2:
+            rule_trace.append(
+                RuleTrace(
+                    rule_id="P-10",
+                    item_id=item["id"],
+                    outcome="penalize",
+                    detail="serves<2 for party>=3",
                 )
             )
 
-    # Budget trace for the final set
-    if budget is not None and running_price > budget:
+    if budget is not None and total_price > budget:
         for item in picks:
             rule_trace.append(
                 RuleTrace(
                     rule_id="P-10",
                     item_id=item["id"],
                     outcome="penalize",
-                    detail=f"set_total={running_price} > budget={budget}",
+                    detail=f"set_total={total_price} > budget={budget}",
                 )
             )
 

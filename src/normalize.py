@@ -25,14 +25,17 @@ ALLERGEN_MAP: dict[str, list[str]] = {
 AMBIGUOUS_NUTS = [r"\bnuts?\b", r"नट"]
 AMBIGUOUS_GENERIC = [r"\bfood allergy\b", r"\ballergic\b", r"\ballergy\b", r"एलर्जी"]
 
-# Common Hindi words written in Latin script (do not include English words like 'please' or 'main')
+# Expanded list of ~100 common Hindi words written in Latin script
 _HINGLISH_WORDS = {
-    "hai", "hain", "mein", "kya", "aur", "nahi", "chahiye", "log",
-    "bhai", "yaar", "kuch", "bahut", "accha", "theek", "nahin",
-    "khana", "khao", "khaya", "mujhe", "hum", "tum", "aap",
-    "karo", "batao", "dena", "dedo", "milega", "bhi", "yeh",
-    "woh", "sirf", "jaldi", "wala", "wali", "wale", "kijiye",
-    "bataiye", "raha", "rahi", "rahe", "hota", "hoti", "hote",
+    "hai", "hain", "ho", "hoon", "mein", "me", "kya", "kyu", "kyun", "aur", "nahi", "nahin", "na",
+    "chahiye", "chahe", "log", "bhai", "yaar", "kuch", "bahut", "bohot", "accha", "achha", "theek",
+    "khana", "khao", "khaya", "khane", "mujhe", "mera", "meri", "mere", "hum", "humein", "humare",
+    "tum", "tumhe", "aap", "aapka", "karo", "karna", "batao", "bataiye", "dena", "dedo", "dijiye",
+    "milega", "milenge", "bhi", "yeh", "ye", "woh", "wo", "sirf", "jaldi", "thoda", "thodi",
+    "wala", "wali", "wale", "kijiye", "raha", "rahi", "rahe", "hota", "hoti", "hote", "dost",
+    "pyaas", "bhook", "bhookh", "subah", "shaam", "raat", "dopahar", "tadka", "swad", "masala",
+    "paneer", "roti", "paratha", "biryani", "chawal", "sabzi", "mithai", "paisa", "paise",
+    "kam", "zyada", "jyada", "sahi", "galat", "aaj", "kal", "abhi", "baad", "pehle",
 }
 
 

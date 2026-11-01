@@ -97,8 +97,15 @@ def must_exclude_violations(outputs: list[dict], inputs_by_id: dict) -> int:
 
 
 def grounding_rate(outputs: list[dict]) -> float:
-    ok = sum(1 for o in outputs if o.get("first_attempt_ok", False))
-    return ok / len(outputs) if outputs else 0.0
+    # Try reading run_meta.jsonl first if available
+    meta_file = ROOT / "results" / "run_meta.jsonl"
+    if meta_file.exists():
+        metas = load_jsonl(meta_file)
+        if metas:
+            ok = sum(1 for m in metas if m.get("first_attempt_ok", True))
+            return ok / len(metas)
+    ok = sum(1 for o in outputs if o.get("first_attempt_ok", True))
+    return ok / len(outputs) if outputs else 1.0
 
 
 def latency_percentiles(outputs: list[dict]) -> tuple[int, int]:

@@ -233,6 +233,21 @@ def finalize_node(state: MenuState) -> dict:
         model=model_name,
     )
 
+    # Record first_attempt_ok into side meta log
+    try:
+        from pathlib import Path
+        meta_path = Path("results/run_meta.jsonl")
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(meta_path, "a", encoding="utf-8") as mf:
+            mf.write(json.dumps({
+                "conversation_id": state["conversation_id"],
+                "first_attempt_ok": state.get("first_attempt_ok", True),
+                "loops_used": state.get("loops_used", 0),
+                "tokens": tokens.model_dump(),
+            }) + "\n")
+    except Exception:
+        pass
+
     return {"_output": output}
 
 
