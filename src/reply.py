@@ -61,7 +61,7 @@ def call_writer_llm(
         content, usage = call_llm(
             [{"role": "system", "content": system}],
             temperature=0.3,
-            max_tokens=1500,
+            max_tokens=220,
         )
         tokens = tokens_from_usage(usage)
 

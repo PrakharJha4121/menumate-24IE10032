@@ -25,27 +25,29 @@ ALLERGEN_MAP: dict[str, list[str]] = {
 AMBIGUOUS_NUTS = [r"\bnuts?\b", r"नट"]
 AMBIGUOUS_GENERIC = [r"\bfood allergy\b", r"\ballergic\b", r"\ballergy\b", r"एलर्जी"]
 
-# Expanded list of ~100 common Hindi words written in Latin script
-_HINGLISH_WORDS = {
-    "hai", "hain", "ho", "hoon", "mein", "me", "kya", "kyu", "kyun", "aur", "nahi", "nahin", "na",
+# Grammatical Hindi words in Latin script (purely grammatical/conversational markers, NO food names or English homonyms like 'me')
+_HINGLISH_GRAMMAR_WORDS = {
+    "hai", "hain", "ho", "hoon", "mein", "kya", "kyu", "kyun", "aur", "nahi", "nahin",
     "chahiye", "chahe", "log", "bhai", "yaar", "kuch", "bahut", "bohot", "accha", "achha", "theek",
-    "khana", "khao", "khaya", "khane", "mujhe", "mera", "meri", "mere", "hum", "humein", "humare",
-    "tum", "tumhe", "aap", "aapka", "karo", "karna", "batao", "bataiye", "dena", "dedo", "dijiye",
-    "milega", "milenge", "bhi", "yeh", "ye", "woh", "wo", "sirf", "jaldi", "thoda", "thodi",
-    "wala", "wali", "wale", "kijiye", "raha", "rahi", "rahe", "hota", "hoti", "hote", "dost",
-    "pyaas", "bhook", "bhookh", "subah", "shaam", "raat", "dopahar", "tadka", "swad", "masala",
-    "paneer", "roti", "paratha", "biryani", "chawal", "sabzi", "mithai", "paisa", "paise",
+    "mujhe", "mera", "meri", "mere", "hum", "humein", "humare", "tum", "tumhe", "aap", "aapka",
+    "karo", "karna", "batao", "bataiye", "dena", "dedo", "dijiye", "milega", "milenge", "bhi",
+    "yeh", "woh", "sirf", "jaldi", "thoda", "thodi", "wala", "wali", "wale", "kijiye",
+    "raha", "rahi", "rahe", "hota", "hoti", "hote", "dost", "pyaas", "bhook", "bhookh",
     "kam", "zyada", "jyada", "sahi", "galat", "aaj", "kal", "abhi", "baad", "pehle",
 }
 
 
 def detect_language(message: str) -> str:
-    """Detect language: 'hi' (Devanagari), 'hinglish', or 'en'."""
-    # Devanagari unicode block
+    """Detect language: 'hi' (Devanagari), 'hinglish', or 'en'.
+
+    Requires genuine grammatical Hindi markers in Latin script (food names alone like biryani,
+    paneer, roti do not make an English sentence Hinglish).
+    """
+    # Devanagari unicode block -> Hindi
     if re.search(r"[\u0900-\u097F]", message):
         return "hi"
     words = set(re.findall(r"\b[a-z]+\b", message.lower()))
-    if words & _HINGLISH_WORDS:
+    if words & _HINGLISH_GRAMMAR_WORDS:
         return "hinglish"
     return "en"
 

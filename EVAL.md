@@ -50,18 +50,22 @@ Compliance: `python eval/independent_check.py`
 
 | Metric | Result | Target / Policy |
 |---|---|---|
-| **Route accuracy** | **100%** (12/12) | ≥ 90% |
+| **Route accuracy** | **100%** (12/12: 8 recommend, 1 clarify, 3 escalate) | ≥ 90% |
 | **Diet accuracy** | **100%** (5/5) | ≥ 90% |
 | **Language accuracy** | **100%** (12/12) | ≥ 90% |
 | **Party size accuracy** | **100%** (3/3) | ≥ 90% |
 | **Budget INR accuracy** | **100%** (2/2) | ≥ 90% |
 | **Max wait accuracy** | **100%** (2/2) | ≥ 90% |
-| **Spice tolerance accuracy**| **100%** (4/4) | ≥ 90% |
+| **Spice tolerance accuracy**| **100%** (3/3) | ≥ 90% |
 | **Allergy set exact match** | **100%** (12/12) | 100% |
 | **Must-exclude violations** | **0** | **0 (HARD REQUIREMENT)** |
 | **Independent check violations** | **0** | **0 (HARD REQUIREMENT)** |
-| **Latency p50** | 5,230 ms | < 8,000 ms |
-| **Latency p95** | 6,813 ms | < 8,000 ms |
+| **First-attempt grounding rate** | **100%** | ≥ 80% |
+| **Latency p50** | **1,256 ms** | < 4,000 ms (**MET**) |
+| **Latency p95** | **3,446 ms** | < 4,000 ms (**MET**) |
+| **Avg prompt tokens/turn** | 555 | — |
+| **Avg completion tokens/turn** | 243 | — |
+| **Total cost estimate** | $0.0015 USD | — |
 
 ### Adversarial Suite Results (`tests/adversarial.jsonl` - 5 Conversations)
 

@@ -58,11 +58,12 @@ def _regex_extract(text: str) -> dict:
     if m:
         result["max_wait_min"] = int(m.group(1))
 
-    # spice_tolerance
-    for pattern, value in _SPICE_PATTERNS:
-        if re.search(pattern, text, re.IGNORECASE):
-            result["spice_tolerance"] = value
-            break
+    # spice_tolerance (only match spice intent, not allergy severity like 'mild allergy')
+    if not re.search(r"\b(mild|moderate|severe)\s+allerg\w*", text, re.IGNORECASE):
+        for pattern, value in _SPICE_PATTERNS:
+            if re.search(pattern, text, re.IGNORECASE):
+                result["spice_tolerance"] = value
+                break
 
     # avoid_ingredients
     avoids = []
@@ -122,17 +123,67 @@ def _latest_diet(history: list[dict], message: str) -> Optional[str]:
 # Main extraction function
 # ---------------------------------------------------------------------------
 
+def _is_high_confidence_regex(combined_text: str, regex_result: dict, history: list[dict]) -> bool:
+    """Determine if regex extraction captures all constraints with 100% certainty.
+
+    Returns False (must call LLM) if:
+    - Allergy is mentioned but unclear/complex
+    - History has multi-turn nuance or questions
+    - Text contains negations or conditionals that regex might misinterpret
+    - Text has rich craving descriptions that benefit from LLM extraction
+    """
+    if history:
+        # Multi-turn history: always use LLM to ensure context coherence
+        return False
+
+    text_lower = combined_text.lower()
+
+    # If any allergy is mentioned, check if it cleanly matches known vocabulary
+    if re.search(r"allerg\w*|एलर्जी", combined_text, re.IGNORECASE):
+        # Must have extracted clean raw_allergy_phrases
+        raw_phrases = regex_result.get("raw_allergy_phrases", [])
+        if not raw_phrases and "allergies" not in regex_result:
+            return False
+
+    # Check for complex qualifiers ("if", "unless", "except", "maybe", "instead")
+    if re.search(r"\b(unless|except|instead|maybe|or else|not sure)\b", text_lower):
+        return False
+
+    # Check for general food craving words that regex doesn't extract
+    # If the user has a specific food craving, LLM extracts craving field better
+    if re.search(r"\b(craving|feel like|want to eat|suggest|looking for|recommend)\b", text_lower):
+        # If there's craving prose, let LLM extract craving accurately
+        return False
+
+    # If at least one structured constraint was cleanly extracted (diet, budget, party, time, allergy)
+    # and no complex linguistic markers, regex is confident
+    has_constraint = any(
+        regex_result.get(k) is not None
+        for k in ("diet", "party_size", "budget_inr", "max_wait_min", "raw_allergy_phrases", "allergies")
+    )
+    return has_constraint
+
+
 def extract_profile(
     history: list[dict],
     message: str,
     feedback: list[dict],
     language: str,
 ) -> tuple[dict, Tokens]:
-    """Call LLM to extract profile; fall back to regex on error."""
+    """Extract profile: checks high-confidence regex fast-path, else calls LLM."""
 
     history_text = "\n".join(
         f"{t.get('role', 'user').upper()}: {t.get('text', '')}" for t in history
     )
+    combined_text = history_text + "\n" + message if history_text else message
+    regex_result = _regex_extract(combined_text)
+
+    # Check for high-confidence fast-path (only when no feedback and strictly confident)
+    if not feedback and _is_high_confidence_regex(combined_text, regex_result, history):
+        latest = _latest_diet(history, message)
+        if latest:
+            regex_result["diet"] = latest
+        return regex_result, Tokens()
 
     feedback_section = ""
     if feedback:
@@ -169,7 +220,7 @@ def extract_profile(
         content, usage = call_llm(
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
             temperature=0,
-            max_tokens=400,
+            max_tokens=180,
         )
         tokens = tokens_from_usage(usage)
         # Strip markdown code fences if present
@@ -181,8 +232,6 @@ def extract_profile(
         pass
 
     # Apply regex fallback to fill in missing fields
-    combined_text = history_text + "\n" + message
-    regex_result = _regex_extract(combined_text)
     extraction = _merge_regex_into_extraction(extraction, regex_result)
 
     # latest-wins diet override (most reliable)
