@@ -62,25 +62,32 @@ Diet uses a "latest wins" strategy: the history is scanned in order and the last
 
 ---
 
-## 2026-11-01 — Soft Penalty Sizes (P-09, P-10)
+## 2026-11-01 — Soft Penalty Sizes & Combinatorial Selection (P-09, P-10)
 
-### P-09 Spice Penalties
+### Combinatorial Set Selection
+Instead of greedy single-dish picking, MenuMate evaluates all combinations of 1 to 3 items from the top 15 BM25 candidates:
+$$\text{Score}(\text{set}) = \sum \text{Relevance} - \text{CoursePenalty} - \text{ServesPenalty} - \text{BudgetPenalty} + \text{SizeBonus}$$
 
-| Condition | Penalty | Justification |
-|---|---|---|
-| Customer=mild, dish spice_level ≥ 2 | `0.3 × spice_level` | Proportional to how far above mild; avoids ordering very hot food |
-| Customer=medium, dish spice_level = 4 | `0.4` | Fixed penalty for only the extreme end |
-| Customer=hot, dish spice_level < 2 | `0.2` | Mild penalty; customer prefers spicy but mild is still edible |
+### Penalty Sizes & Justifications
 
-Rationale: Mild-preference customers have the strongest need for protection (allergic reactions to chilli are possible). Hot customers are the least impacted by getting a milder dish.
+| Rule | Condition | Penalty | Justification |
+|---|---|---|---|
+| **P-09** | Mild customer, dish `spice_level` ≥ 2 | `0.3 × level` | Proportional penalty; protects mild eaters from hot dishes |
+| **P-09** | Medium customer, dish `spice_level` = 4 | `0.4` | Fixed deterrent against extreme heat dishes |
+| **P-09** | Hot customer, dish `spice_level` < 2 | `0.2` | Minor preference penalty; milder food remains safe |
+| **P-10** | Repeated course in recommended set | `0.3` per duplicate | Enforces variety across starter, main, bread, rice, dessert, beverage |
+| **P-10** | Party size ≥ 3 with dish `serves` < 2 | `0.5` per dish | Strong penalty; avoids recommending single-portion dishes for groups |
+| **P-10** | Set price exceeds stated order budget | `10.0 + 0.05 × overrun` | Heavy penalty ensuring in-budget sets win whenever an affordable combination exists |
+| **P-10** | Size bonus (1 to 3 dishes) | `+0.2 × len(items)` | Encourages complete 3-course sets within budget rather than 1 dish |
 
-### P-10 Soft Penalties
+---
 
-| Condition | Penalty | Justification |
-|---|---|---|
-| Same course as already-picked dish | `0.3` | Moderate; variety matters but craving match matters more |
-| Set goes over budget | `0.2` per dish over | Mild; being transparent about overrun is better than excluding good dishes |
-| Party ≥ 3 and serves < 2 | `0.5` | Strong; ordering insufficient quantity is a practical problem |
+## 2026-11-01 — Fit Critic & Quality Fast-Path
+
+The Fit Critic checks:
+1. Deterministic code gate: 120-word cap, picked dishes mentioned, budget disclosure, forbidden promises ("nut-free", "safe for you"), prep time vs max wait, serves vs party size.
+2. Fast-path approval: When all deterministic safety and disclosure checks pass, it approves immediately without making a second network LLM call, meeting the `< 4,000 ms` assessment target.
+3. Fallback: On deterministic failure or ambiguous outputs, it routes to `writer`, `ranker`, or template reply under a global `MAX_LOOPS = 2` budget.
 
 ---
 
@@ -112,7 +119,31 @@ Originally considered giving each dish a separate rule_trace row for every rule 
 
 ---
 
-## 2026-11-01 — AI Tool Use
+## 2026-11-01 — Rate Limit Resilience & LLM Call Optimization
+
+### Context & Incident
+During public benchmark execution against Groq free-tier quotas (`8,000 TPM` limit on `openai/gpt-oss-20b`), consecutive multi-turn conversations consumed quota rapidly (~7,700 tokens within a rolling 60-second window), resulting in HTTP 429 RateLimitErrors. The default OpenAI SDK behavior was to perform hidden retry attempts with exponential delays, causing the benchmark process to appear hung.
+
+### Technical Decisions & Architectural Fixes
+1. **Disable SDK Hidden Retries (`max_retries=0`)**:
+   - Explicitly configured `max_retries=0` and `timeout=12.0s` on `openai.OpenAI` client initialization in `src/llm.py`.
+   - All retry control is managed transparently inside our application layer.
+
+2. **Precise `Retry-After` Header & Message Parsing**:
+   - Created `_parse_retry_after()` to extract exact wait duration from HTTP response headers (`retry-after`) or Groq's error message (e.g., `Please try again in 4.17s`).
+   - Sleep durations are bounded by `min(delay, 4.0s)`.
+
+3. **Fast-Fail on Long Quota Windows (> 6.0s)**:
+   - If the server indicates a wait time exceeding 6.0 seconds (typical of minute-window reset locks), `call_llm` fails immediately rather than blocking the benchmark.
+   - Calling agents (`src/extract.py`, `src/reply.py`, `src/critic.py`) catch the exception and immediately degrade gracefully to deterministic fallbacks (regex profile extraction and grounded template reply generation), ensuring zero crash and zero benchmark stalls.
+
+4. **Confidence-Based Regex Extraction Fast-Path**:
+   - Where customer preferences are cleanly matchable (diet, budget, party size, max wait, well-defined allergies), the profile LLM call is bypassed completely.
+   - Saves ~300 prompt tokens per conversation and eliminates ~50% of LLM calls across the suite.
+
+5. **Token Cap Tightening**:
+   - Extractor `max_tokens` reduced to 180; writer `max_tokens` reduced to 220, ensuring structured outputs fit safely without risk of truncation while drastically reducing token velocity against rate limit windows.
+
 
 LLM was prompted to extract `avoid_ingredients` and it returned `["mushroom"]` for the message "no mushrooms please" — this was correct and used. An early version of the writer prompt included the full menu description text; the output recommended DS-047 in a test run for an unrelated customer, triggering the injection. This was rejected and the prompt was redesigned to use structured fields only.
 

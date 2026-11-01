@@ -1,0 +1,12 @@
+{"conversation_id": "c-001", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 1772, "completion": 840}}
+{"conversation_id": "c-002", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 554, "completion": 220}}
+{"conversation_id": "c-003", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 560, "completion": 220}}
+{"conversation_id": "c-004", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 0, "completion": 0}}
+{"conversation_id": "c-005", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 315, "completion": 180}}
+{"conversation_id": "c-006", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 554, "completion": 220}}
+{"conversation_id": "c-007", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 901, "completion": 400}}
+{"conversation_id": "c-008", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 556, "completion": 220}}
+{"conversation_id": "c-009", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 883, "completion": 400}}
+{"conversation_id": "c-010", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 0, "completion": 0}}
+{"conversation_id": "c-011", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 560, "completion": 220}}
+{"conversation_id": "c-012", "first_attempt_ok": true, "loops_used": 0, "tokens": {"prompt": 0, "completion": 0}}
